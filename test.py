@@ -10,8 +10,8 @@ def sim(v1, v2):
 w1 = sys.argv[1]
 
 model = {}
-for line in file("./data/text8.model"):
-    tks = line.strip().split('\t')
+for line in file("./data/text8_sw2v.model"):
+    tks = line.strip().split(' ')
     model[tks[0]] = [float(x) for x in tks[1:]]
 
 f1 = model[w1]

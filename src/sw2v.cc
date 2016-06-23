@@ -1,6 +1,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <cmath>
 #include <map>
 #include <string>
@@ -14,182 +15,241 @@ using namespace std;
 
 namespace sw2v {
 
-void SparseWord2Vec::LoadData(const char * fname) {
+void SparseWord2Vec::LoadVocab(const char * fname) {
   ifstream in(fname);
   string line;
+  getline(in, line);
+  int size = atoi(line.c_str());
+  words_ = vector<string>(size);
+  freq_ = vector<int>(size, 0);
   while(getline(in, line)) {
-    vector<string> words;
-    boost::split(words, line, boost::is_any_of("\t "));
-    for(int i = 0; i < words.size(); i++) {
-      string word = words[i];
-      map<string, int>::iterator k = word_index_.find(word);
-      if (k == word_index_.end()) {
-        word_index_[word] = words_.size();
-        words_.push_back(word);
-        model_.push_back(vector<float>(nhidden_, 0));
-      }
-      data_.push_back(word_index_[word]);
-    }
+    istringstream iss(line);
+    string word;
+    int index, freq;
+    iss >> word >> index >> freq;
+    words_[index] = word;
+    freq_[index] = freq;
   }
-  cout << "doc count: " << data_.size() << endl;
-  cout << "word count: " << word_index_.size() << endl;
+  in.close();
+  cout << size << endl;
+  model_ = vector<float>(words_.size() * nhidden_, 0);
 
-  for(int i = 0; i < data_.size(); i++) {
-    if(data_[i] >= model_.size()) {
-      cout << data_[i] << "\t" << model_.size() << endl;
-      exit(1);
+  for(int i = 0; i < freq_.size(); i++) {
+    int f = (int)pow((double)freq_[i], 0.75);
+    for(int j = 0; j < f; j++) {
+      negative_.push_back(i);
     }
   }
+}
+
+inline float rand01() {
+  return (float)(rand() % 100000) / 100000.0;
 }
 
 void SparseWord2Vec::InitModel() {
-  float nv = sqrt((float)nhidden_);
+  float nv = sqrt(1.0 + (float)nhidden_);
   for(int i = 0; i < model_.size(); i++) {
-    vector<float> & vec = model_[i];
-    for(int j = 0; j < nhidden_; j++) {
-      float r = (float)(rand() % 10000) / 10000.0;
-      vec[j] = (r - 0.5) / nv;
-    }
+    model_[i] = (rand01() - 0.5) / nv;
   }
 }
 
-bool SecondGreater (const pair<string, float> & a,
-                 const pair<string, float> & b) {
+bool SecondGreater (const pair<int, float> & a,
+                 const pair<int, float> & b) {
   return a.second > b.second;
 }
 
 void SparseWord2Vec::SaveModel() {
-  ofstream out("./data/text8.model");
-  for(int i = 0; i < model_.size(); i++) {
-    out << words_[i];
-    for(int j = 0; j < model_[i].size(); j++) {
-      out << "\t" << model_[i][j];
+  ofstream out("./data/text8_sw2v.model");
+  vector< pair<int, float> > freqs;
+  for(int i = 0; i < freq_.size(); i++) {
+    if(freq_[i] < 5) continue;
+    freqs.push_back(make_pair<int, float>(i, (float)freq_[i]));
+  }
+  sort(freqs.begin(), freqs.end(), SecondGreater);
+  out << freqs.size() << " " << nhidden_ << endl;
+  for(int i = 0; i < freqs.size(); i++) {
+    int w = freqs[i].first;
+    out << words_[w];
+    int start = w * nhidden_;
+    int end = start + nhidden_;
+    for(int j = start; j < end; j++) {
+      out << " " << model_[j];
     }
     out << endl;
   }
   out.close();
 }
 
-void SparseWord2Vec::PrintHiddens() {
-  vector< vector< pair<string, float> > > hiddens(nhidden_);
-  for(int i = 0; i < model_.size(); i++) {
-    for(int j = 0; j < model_[i].size(); j++) {
-      hiddens[j].push_back(make_pair<string, float>(words_[i], model_[i][j]));
+float auc(vector< pair<int, float> > & label_preds) {
+  sort(label_preds.begin(), label_preds.end(), SecondGreater);
+  long long m = 0;
+  long long n = 0;
+  long long p = 0;
+  for(int i = 0; i < label_preds.size(); i++) {
+    pair<int, float> & e = label_preds[i];
+    if(e.first == 1) {
+      m += 1;
+      p += (label_preds.size() - i);
     }
+    else n += 1;
   }
-
-  for(int h = 0; h < nhidden_; h++) {
-    sort(hiddens[h].begin(), hiddens[h].end(), SecondGreater);
-    cout << "hidden: " << h << endl;
-    for(int i = 0; i < 32 && i < hiddens[h].size(); i++) {
-      cout << "\t" << hiddens[h][i].first << "\t"
-           << hiddens[h][i].second << endl;
-    }
-  }
+  p -= m * (m + 1);
+  return (float)((double)(p) / (double)(m * n));
 }
 
-void SparseWord2Vec::Train() {
-  float total = 0.0;
-  float total_err = 0.0;
 
-  long long n = 0;
+void SparseWord2Vec::Train(DataIter & iter) {
+  int n = 0;
   cout << "begin training..." << endl;
-  for(int i = 0; i < 100; i++) {
+  float pred = 0.0;
+  while(true) {
+    vector<int> data = iter.NextWords(100000);
+    if(data.size() == 0) break;
+    vector<Sample> batch;
+    batch.reserve(data.size() * (win_size_ + 1) + 100);
 #pragma omp parallel for
-    for(int k = 0; k < data_.size(); k++) {
-      int start = MAX(0, k - 5);
-      int end = MIN(data_.size(), k + 5);
-      vector<int> win;
+    for(int k = 0; k < data.size(); k++) {
+      int start = MAX(0, k - win_size_);
+      int end = MIN(data.size(), k + win_size_);
+      Sample s(1.0, data[k]);
       for(int j = start; j <= end; j++) {
         if(j == k) continue;
-        win.push_back(data_[j]);
+        s.context_.push_back(data[j]);
       }
+      LockAll();
+      batch.push_back(s);
+      UnLockAll();
       
-      total_err += abs(OneStep(data_[k], win, 1.0));
-      total += 1.0;
-
-      for(int j = 0; j < 10; j++) {
-        int k2 = rand() % data_.size();
-        total_err += abs(OneStep(data_[k2], win, 0.0));
-        total += 1.0;
-      }
-      if (++n % 100000 == 0){
-        cout << n / 10000 << "\t" << total_err / total << endl;
-        total_err = 0.0;
-        total = 0.0;
+      for(int j = 0; j < win_size_; j++) {
+        int k2 = rand() % negative_.size();;
+        if(negative_[k2] == data[k]) continue;
+        Sample s2(0.0, negative_[k2]);
+        s2.context_ = s.context_;
+        LockAll();
+        batch.push_back(s2);
+        UnLockAll();
       }
     }
-    cout << "finish " << i << endl;
-    PrintHiddens();
-    SaveModel();
-    learning_rate_ *= 0.9;
+    int nbatch = batch.size() / batch_size_;
+    vector< pair<int, float> > label_preds;
+    label_preds.reserve(batch.size() + 100);
+#pragma omp parallel for
+    for(int b = 0; b < nbatch; b++) {
+      int start = b * batch_size_;
+      int end = MIN(start + batch_size_, batch.size() - 1);
+      if(end <= start) continue;
+      vector<Sample> sub_batch(batch.begin() + start, batch.begin() + end);
+      vector< pair<int, float> > sub_label_preds = MiniBatch(sub_batch);
+      LockAll();
+      for(int j = 0; j < sub_label_preds.size(); j++)
+        label_preds.push_back(sub_label_preds[j]);
+      UnLockAll();
+    }
+    cout << n++ << "\t" << auc(label_preds) << endl;
+    label_preds.clear();
   }
+  SaveModel();
 }
 
-inline float dot(const vector<float> & f1,
-                 const vector<float> & f2) {
+inline float dot(const float * f1, const float * f2, const int n) {
   float ret = 0.0;
-  for(int i = 0; i < f1.size(); i++) {
+  for(int i = 0; i < n; i++) {
     ret += f1[i] * f2[i];
   }
   return ret;
 }
 
-float SparseWord2Vec::OneStep(int w1, vector<int> & w2s, float label) {
-  float lambda_ = 0.001;
+void AddVector(float * dst, const float * src, const int n) {
+  for(int i = 0; i < n; i++) {
+    dst[i] += src[i];
+  }
+}
+
+inline float sign(const float x) {
+  if(x < 0) return -1.0;
+  else if(x > 0) return 1.0;
+  else return 0.0;
+}
+
+vector< pair<int, float> > SparseWord2Vec::MiniBatch(const vector<Sample> & batch) {
+  vector< pair<int, float> > ret;
+  ret.reserve(batch.size() + 1);
+  map<int, float*> batch_model;
+  map<int, vector<float> > grads;
+  for(int i = 0; i < batch.size(); i++) {
+    int w = batch[i].target_;
+    map<int, float*>::iterator k = batch_model.find(w);
+    if (k == batch_model.end()) {
+      batch_model[w] = model_.data() + w * nhidden_;
+    }
+    for(int j = 0; j < batch[i].context_.size(); j++) {
+      w = batch[i].context_[j];
+      k = batch_model.find(w);
+      if(k == batch_model.end()) {
+        batch_model[w] = model_.data() + w * nhidden_;
+      }
+    }
+  }
+  for(map<int, float*>::const_iterator i = batch_model.begin();
+      i != batch_model.end(); i++) {
+    grads[i->first] = vector<float>(nhidden_, 0);
+  }
+  for(int i = 0; i < batch.size(); i++) {
+    float pred = OneStep(batch[i].target_, batch[i].context_, batch[i].label_,
+                         batch_model, grads);
+    ret.push_back(make_pair<int, float>((int)batch[i].label_, pred));
+  }
+
+  for(map<int, vector<float> >::const_iterator i = grads.begin();
+      i != grads.end(); i++) {
+    Lock(i->first);
+    AddVector(model_.data() + nhidden_ * i->first, i->second.data(), nhidden_);
+    UnLock(i->first);
+  }
+  return ret;
+}
+
+float SparseWord2Vec::OneStep(int w1, const vector<int> & w2s, float label,
+                              const map<int, float*> & batch_model,
+                              map<int, vector<float> > & grads) {
+  float lambda_ = 0.00001;
   float pred = 0.0;
-  vector<float> & f1 = model_[w1];
-  vector<float> sf2(f1.size(), 0.0);
+  map<int, float*>::const_iterator mi;
+
+  mi = batch_model.find(w1);
+  const float * f1 = mi->second;
+  vector<float> sf2(nhidden_, 0.0);
   
   for(int i = 0; i < w2s.size(); i++) {
     int w2 = w2s[i];
-    vector<float> & f2 = model_[w2];
-    for(int j = 0; j < f2.size(); j++) {
-      sf2[j] += f2[j];
-    }
-    pred += dot(f1, f2);
+    mi = batch_model.find(w2);
+    const float * f2 = mi->second;
+    AddVector(sf2.data(), f2, nhidden_);
+    pred += dot(f1, f2, nhidden_);
   }
-  pred = 1.0 / (1.0 + exp(-1.0 * pred));
+  pred = Sigmoid(pred);
   float err = (label - pred);
   
-  vector<float> d1(f1.size(), 0.0f);
-  for (int i = 0; i < f1.size(); i++) {
+  vector<float> & d1 = grads[w1];
+  for (int i = 0; i < nhidden_; i++) {
     float v1 = f1[i];
     float v2 = sf2[i];
-    d1[i] += learning_rate_ * (err * v2 - lambda_);
+    d1[i] = learning_rate_ * (err * v2 - lambda_ * v1);
   }
 
   for(int i = 0; i < w2s.size(); i++) {
     int w2 = w2s[i];
-    vector<float> & f2 = model_[w2];
-    vector<float> d2(f2.size(), 0.0f);
-  
-    for(int i = 0; i < f1.size(); i++) {
-      float v1 = f1[i];
-      float v2 = f2[i];
-      
-      d2[i] += learning_rate_ * (err * v1 - lambda_);
-    }
+    mi = batch_model.find(w2);
+    const float * f2 = mi->second;
 
-    Lock(w2);
-    for(int i = 0; i < f2.size(); i++) {
-      if (f2[i] * (f2[i] + d2[i]) < 0.0)
-        f2[i] = 0.0;
-      else:
-        f2[i] += d2[i];
+    vector<float> & d2 = grads[w2];
+    for(int j = 0; j < nhidden_; j++) {
+      float v1 = f1[j];
+      float v2 = f2[j];      
+      d2[j] = learning_rate_ * (err * v1 - lambda_ * v2);
     }
-    UnLock(w2);
   }
-  Lock(w1);
-  for(int i = 0; i < f1.size(); i++) {
-    if (f1[i] * (f1[i] + d1[i]) < 0.0)
-      f1[i] = 0.0;
-    else:
-      f1[i] += d1[i];
-  }
-  UnLock(w1);
-  
-  return err;
+  return pred;
 }
 
 }
