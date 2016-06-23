@@ -7,12 +7,11 @@
 #include <cmath>
 using namespace std;
 
-#include <omp.h>
 #include <data_iter.h>
+#include "ps/ps.h"
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
-#define NLOCK    8192
 
 #define SIGMOID_MAX 6.0
 #define SIGMOID_MIN -6.0
@@ -36,12 +35,9 @@ class SparseWord2Vec {
     win_size_ = win_size;
     learning_rate_ = learning_rate;
     batch_size_ = batch_size;
-    
-    locks_ = vector<omp_lock_t>(NLOCK);
-    for(int i = 0; i < NLOCK; i++)
-      omp_init_lock(&locks_[i]);
-    omp_init_lock(&lock_);
 
+    kv_ = new ps::KVWorker<float>(0);
+    
     sigmoid_ = vector<float>(10000, 0);
     float h = (SIGMOID_MAX - SIGMOID_MIN) / 10000.0;
     for(int i = 0; i < 10000; i++) {
@@ -56,22 +52,6 @@ class SparseWord2Vec {
     return sigmoid_[(int)(10000.0 * (x - SIGMOID_MIN) / (SIGMOID_MAX - SIGMOID_MIN))];
   }
 
-  void LockAll() {
-    omp_set_lock(&lock_);
-  }
-
-  void UnLockAll() {
-    omp_unset_lock(&lock_);
-  }
-
-  void Lock(int w) {
-    omp_set_lock(&locks_[w % NLOCK]);
-  }
-
-  void UnLock(int w) {
-    omp_unset_lock(&locks_[w % NLOCK]);
-  }
-  
   void LoadVocab(const char * fname);
   void InitModel();
   void Train(DataIter & iter);
@@ -86,8 +66,7 @@ private:
   vector<string> words_;
   vector<int> freq_;
   vector<float> model_;
-  vector<omp_lock_t> locks_;
-  omp_lock_t lock_;
+  ps::KVWorker<float> * kv_;
   int nhidden_;
   int batch_size_;
   int win_size_;
