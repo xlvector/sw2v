@@ -1,4 +1,5 @@
 *.list
+*.log
 log
 sw2v
 data

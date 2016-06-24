@@ -1,9 +1,13 @@
 #include <cstdlib>
+#include <string>
+#include <cstdio>
 #include <ctime>
 using namespace std;
 
 #include <omp.h>
 #include <sw2v.h>
+
+#ifndef LOCAL
 #include "ps/ps.h"
 
 void StartServer() {
@@ -12,22 +16,34 @@ void StartServer() {
   server->set_request_handle(ps::KVServerDefaultHandle<float>());
   ps::RegisterExitCallback([server](){ delete server; });
 }
+#endif
 
 int main(int argc, char ** argv) {
+#ifndef LOCAL
   StartServer();
   ps::Start();
 
   if (ps::IsWorker()) {
+#endif  
     srand(time(NULL));
-    sw2v::SparseWord2Vec algo(200, 5, 16, 0.005);
+    sw2v::SparseWord2Vec algo(200, 5, 8, 0.005);
     algo.LoadVocab("./data/text8.vocab");
-    algo.InitModel();
+
+#if LOCAL
+    int rank = 0;
+#else
+    int rank = ps::MyRank();
+#endif
     for(int i = 0; i < 100; i++) {
-      DataIter iter("./data/text8.ints");
+      string fname = "./data/text8.ints." + to_string(rank);
+      cout << fname << endl;
+      DataIter iter(fname.c_str());
       algo.Train(iter);
       cout << "epoc " << i << endl;
     }
+#ifndef LOCAL
   }
-
+  
   ps::Finalize();
+#endif
 }

@@ -1,4 +1,4 @@
 pkill -9 sw2v
 sleep 1
 make clean
-make
+make -f Makefile.ps
