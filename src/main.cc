@@ -34,7 +34,7 @@ int main(int argc, char ** argv) {
 #else
     int rank = ps::MyRank();
 #endif
-    for(int i = 0; i < 100; i++) {
+    for(int i = 0; i < 1; i++) {
       string fname = "./data/text8.ints." + to_string(rank);
       cout << fname << endl;
       DataIter iter(fname.c_str());

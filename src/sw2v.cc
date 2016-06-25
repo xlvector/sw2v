@@ -46,30 +46,31 @@ void SparseWord2Vec::LoadVocab(const char * fname) {
   in.close();
   cout << size << endl;
 
+  int nword = freq_.size();
 #if LOCAL
-  model_ = vector<float>(freq_.size() * nhidden_, 0);
-  for(int i = 0; i < model_.size(); i++) {
+  model_ = vector<float>(nword * nhidden_, 0);
+  for(int i = 0; i < nword; i++) {
     model_[i] = (RAND01() - 0.5) / sqrt(1.0 + (float)nhidden_);
   }
 #else
   int rank = ps::MyRank();
   if (rank == 0) {
-    vector<ps::Key> keys(freq_.size(), 0);
-    vector<float> vals(freq_.size(), 0);
-    for(int i = 0; i < freq_.size(); i++) {
+    vector<ps::Key> keys(nword, 0);
+    vector<float> vals(nword, 0);
+    for(int i = 0; i < nword; i++) {
       keys[i] = i;
       vals[i] = (RAND01() - 0.5) / sqrt(float(nhidden_) + 1.0);
     }
     kv_->Wait(kv_->Push(keys, vals));
     cout << rank << " send init data ok" << endl;
   } else {
-    std::chrono::milliseconds duration(10000);
+    std::chrono::milliseconds duration(5000);
     std::this_thread::sleep_for(duration);
     cout << rank << " wake up" << endl;
   }
 #endif
   
-  for(int i = 0; i < freq_.size(); i++) {
+  for(int i = 0; i < nword; i++) {
     int f = (int)pow((double)freq_[i], 0.75);
     for(int j = 0; j < f; j++) {
       negative_.push_back(i);
@@ -108,11 +109,12 @@ float auc(vector< pair<int, float> > & label_preds) {
   long long m = 0;
   long long n = 0;
   long long p = 0;
-  for(int i = 0; i < label_preds.size(); i++) {
+  int nsamples = label_preds.size();
+  for(int i = 0; i < nsamples; i++) {
     pair<int, float> & e = label_preds[i];
     if(e.first == 1) {
       m += 1;
-      p += (label_preds.size() - i);
+      p += (nsamples - i);
     }
     else n += 1;
   }
@@ -188,17 +190,17 @@ void SparseWord2Vec::Train(DataIter & iter) {
 }
 
 inline float dot(const vector<float> & f1, const vector<float> & f2) {
-  CHECK_EQ(f1.size(), f2.size());
+  int n = f1.size();
   float ret = 0.0;
-  for(int i = 0; i < f1.size(); i++) {
+  for(int i = 0; i < n; i++) {
     ret += f1[i] * f2[i];
   }
   return ret;
 }
 
-void AddVector(vector<float> & dst, const vector<float> & src) {
-  CHECK_EQ(src.size(), dst.size());
-  for(int i = 0; i < dst.size(); i++) {
+inline void AddVector(vector<float> & dst, const vector<float> & src) {
+  int n = dst.size();
+  for(int i = 0; i < n; i++) {
     dst[i] += src[i];
   }
 }
