@@ -79,6 +79,15 @@ void SparseWord2Vec::LoadVocab(const char * fname) {
 
 }
 
+bool SparseWord2Vec::SkipFreqWord(int w) {
+  float fw = (float)freq_[w];
+  float t = 1000.0;
+  float p = (fw - t) / fw;
+  p -= sqrt(t / fw);
+  if(RAND01() < p) return true;
+  return false;
+}
+
 /*
 void SparseWord2Vec::SaveModel() {
   ofstream out("./data/text8_sw2v.model");
@@ -138,6 +147,7 @@ void SparseWord2Vec::Train(DataIter & iter) {
     for(int k = 0; k < data.size(); k++) {
       int start = MAX(0, k - win_size_);
       int end = MIN(data.size() - 1, k + win_size_);
+      if(SkipFreqWord(data[k])) continue;
       Sample s(1.0, data[k]);
       for(int j = start; j <= end && j < data.size(); j++) {
         if(j == k) continue;
@@ -151,8 +161,9 @@ void SparseWord2Vec::Train(DataIter & iter) {
       UnLockAll();
 #endif      
       for(int j = 0; j < win_size_; j++) {
-        int k2 = rand() % negative_.size();;
+        int k2 = rand() % negative_.size();
         if(negative_[k2] == data[k]) continue;
+        if(SkipFreqWord(negative_[k2])) continue;
         Sample s2(0.0, negative_[k2]);
         s2.context_ = s.context_;
 #if LOCAL

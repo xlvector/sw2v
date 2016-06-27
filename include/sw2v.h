@@ -80,6 +80,7 @@ class SparseWord2Vec {
                 const unordered_map<int, vector<float> > & batch_model,
                 unordered_map<int, vector<float> > & grads);
   void SaveModel();
+  bool SkipFreqWord(int w);
 private:
   vector<float> sigmoid_;
   vector<int> negative_;
