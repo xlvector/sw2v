@@ -1,0 +1,17 @@
+{
+    "id": "sw2v-scheduler",
+    "container": {
+    "type": "DOCKER",
+    "docker": {
+          "image": "registry.aliyuncs.com/xlvector/sw2v",
+          "network": "BRIDGE",
+          "portMappings": [
+            { "hostPort": 80, "containerPort": 80, "protocol": "tcp"}
+          ]
+        }
+    },
+    "acceptedResourceRoles": ["slave_public"],
+    "instances": 1,
+    "cpus": 0.1,
+    "mem": 64
+}
