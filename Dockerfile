@@ -10,5 +10,5 @@ RUN cd /tmp/sw2v/ps-lite && make
 
 RUN cd /tmp/sw2v && make -f Makefile.ps
 
-ENTRYPOINT ["/tmp/sw2v/dcos.sh"]
+ENTRYPOINT ["/tmp/sw2v/sw2v"]
 
