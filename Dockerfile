@@ -14,4 +14,4 @@ RUN apt-get install -y libboost-dev libboost-system-dev
 
 RUN cd sw2v && make -f Makefile.ps
 
-ENTRYPOINT ["dcos.sh"]
+ENTRYPOINT ["./sw2v/dcos.sh"]
