@@ -22,7 +22,6 @@ int main(int argc, char ** argv) {
 #ifndef LOCAL
   StartServer();
   ps::Start();
-
   if (ps::IsWorker()) {
 #endif
     string root = ps::Environment::Get()->find("SW2V_DATA");

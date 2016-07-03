@@ -8,7 +8,7 @@ RUN git clone --recursive https://github.com/xlvector/sw2v /tmp/sw2v
 
 RUN cd /tmp/sw2v/ps-lite && make
 
-RUN echo "begin build"
+RUN echo "begin build 2"
 
 RUN cd /tmp/sw2v && make -f Makefile.ps
 
