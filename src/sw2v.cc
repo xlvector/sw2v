@@ -44,7 +44,7 @@ void SparseWord2Vec::LoadVocab(const char * fname) {
     freq_[index] = freq;
   }
   in.close();
-  cout << size << endl;
+  cout << "vocab size: " << size << endl;
 
   int nword = freq_.size();
 #if LOCAL

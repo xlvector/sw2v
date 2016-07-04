@@ -12,5 +12,7 @@ RUN echo "begin build 2"
 
 RUN cd /tmp/sw2v && make -f Makefile.ps
 
+RUN mkdir -p /mnt/dcos
+
 ENTRYPOINT ["/tmp/sw2v/sw2v"]
 
