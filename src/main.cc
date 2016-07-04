@@ -2,6 +2,8 @@
 #include <string>
 #include <cstdio>
 #include <ctime>
+#include <chrono>
+#include <thread>
 using namespace std;
 
 #include <omp.h>
@@ -46,4 +48,9 @@ int main(int argc, char ** argv) {
   
   ps::Finalize();
 #endif
+  cout << "finished" << endl;
+  while(true) {
+    this_thread::sleep_for(chrono::seconds(5));
+    cout << "sleep" << endl;
+  }
 }

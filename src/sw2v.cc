@@ -138,6 +138,7 @@ void SparseWord2Vec::Train(DataIter & iter) {
   float pred = 0.0;
   while(true) {
     vector<int> data = iter.NextWords(10000);
+    cout << "data size: " << data.size() << endl;
     if(data.size() == 0) break;
     vector<Sample> batch;
     batch.reserve(data.size() * (win_size_ + 1) + 1);
