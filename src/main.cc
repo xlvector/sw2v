@@ -32,7 +32,7 @@ int main(int argc, char ** argv) {
 #endif
     string root = ps::Environment::Get()->find("SW2V_DATA");
     srand(time(NULL));
-    sw2v::SparseWord2Vec algo(200, 5, 8, 0.005);
+    sw2v::SparseWord2Vec algo(200, 5, 128, 0.005);
     algo.LoadVocab((root + "/text8.vocab").c_str());
 
 #if LOCAL
