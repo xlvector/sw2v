@@ -21,6 +21,10 @@ void StartServer() {
 #endif
 
 int main(int argc, char ** argv) {
+  string port = ps::Environment::Get()->find("PORT");
+  cout << "port: " << port << endl;
+  port = ps::Environment::Get()->find("PORT0");
+  cout << "port: " << port << endl;
 #ifndef LOCAL
   StartServer();
   ps::Start();
