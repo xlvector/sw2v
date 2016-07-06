@@ -49,15 +49,16 @@ void SparseWord2Vec::LoadVocab(const char * fname) {
   int nword = freq_.size();
 #if LOCAL
   model_ = vector<float>(nword * nhidden_, 0);
-  for(int i = 0; i < nword; i++) {
+  for(int i = 0; i < model_.size(); i++) {
     model_[i] = (RAND01() - 0.5) / sqrt(1.0 + (float)nhidden_);
   }
 #else
+  int model_size = nword * nhidden_;
   int rank = ps::MyRank();
   if (rank == 0) {
     vector<ps::Key> keys(nword, 0);
     vector<float> vals(nword, 0);
-    for(int i = 0; i < nword; i++) {
+    for(int i = 0; i < model_size; i++) {
       keys[i] = i;
       vals[i] = (RAND01() - 0.5) / sqrt(float(nhidden_) + 1.0);
     }
@@ -88,30 +89,19 @@ bool SparseWord2Vec::SkipFreqWord(int w) {
   return false;
 }
 
-/*
-void SparseWord2Vec::SaveModel() {
-  ofstream out("./data/text8_sw2v.model");
-  vector< pair<int, float> > freqs;
-  for(int i = 0; i < freq_.size(); i++) {
-    if(freq_[i] < 5) continue;
-    float f = (float)freq_[i];
-    freqs.push_back(pair<int, float>(i, f));
-  }
-  sort(freqs.begin(), freqs.end(), SecondGreater);
-  out << freqs.size() << " " << nhidden_ << endl;
-  for(int i = 0; i < freqs.size(); i++) {
-    int w = freqs[i].first;
-    out << words_[w];
-    int start = w * nhidden_;
-    int end = start + nhidden_;
-    for(int j = start; j < end; j++) {
-      out << " " << model_[j];
-    }
-    out << endl;
+void SparseWord2Vec::SaveModel(const char * filename) {
+  int model_size = freq_.size() * nhidden_;
+  vector<ps::Key> keys(model_size, 0);
+  for(int i = 0; i < model_size; i++) keys[i] = i;
+  vector<float> vals;
+  kv_->Wait(kv_->Pull(keys, &vals));
+  ofstream out(filename);
+  for(int i = 0; i < model_size;i++) {
+    int w = i / nhidden_;
+    out << w << "\t" << words_[w] << "\t" << vals[i] << endl;
   }
   out.close();
 }
-*/
 
 float auc(vector< pair<int, float> > & label_preds) {
   sort(label_preds.begin(), label_preds.end(), SecondGreater);
