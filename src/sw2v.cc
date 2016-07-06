@@ -54,21 +54,14 @@ void SparseWord2Vec::LoadVocab(const char * fname) {
   }
 #else
   int model_size = nword * nhidden_;
-  int rank = ps::MyRank();
-  if (rank == 0) {
-    vector<ps::Key> keys(model_size, 0);
-    vector<float> vals(model_size, 0);
-    for(int i = 0; i < model_size; i++) {
-      keys[i] = i;
-      vals[i] = (RAND01() - 0.5) / sqrt(float(nhidden_) + 1.0);
-    }
-    kv_->Wait(kv_->Push(keys, vals));
-    cout << rank << " send init data ok" << endl;
-  } else {
-    std::chrono::milliseconds duration(5000);
-    std::this_thread::sleep_for(duration);
-    cout << rank << " wake up" << endl;
+  vector<ps::Key> keys(nword, 0);
+  vector<float> vals(nword, 0);
+  for(int i = 0; i < model_size; i++) {
+    keys[i] = rand() % model_size;
+    vals[i] = (RAND01() - 0.5) / sqrt(float(nhidden_) + 1.0);
   }
+  kv_->Wait(kv_->Push(keys, vals));
+  cout << rank << " send init data ok" << endl;
 #endif
   
   for(int i = 0; i < nword; i++) {
