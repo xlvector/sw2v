@@ -46,7 +46,7 @@ int main(int argc, char ** argv) {
       DataIter iter(fname.c_str());
       algo.Train(iter);
       cout << "epoc " << i << endl;
-      if (rank == 0) {
+      if (rank == 0 && (i+1) % 20 == 0) {
         string mfile = root + "/text8.model";
         algo.SaveModel(mfile.c_str());
       }
