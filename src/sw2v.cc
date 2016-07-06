@@ -61,7 +61,7 @@ void SparseWord2Vec::LoadVocab(const char * fname) {
     vals[i] = (RAND01() - 0.5) / sqrt(float(nhidden_) + 1.0);
   }
   kv_->Wait(kv_->Push(keys, vals));
-  cout << rank << " send init data ok" << endl;
+  cout << "send init data ok" << endl;
 #endif
   
   for(int i = 0; i < nword; i++) {
