@@ -95,6 +95,7 @@ void SparseWord2Vec::SaveModel(const char * filename) {
   for(int i = 0; i < model_size; i++) keys[i] = i;
   vector<float> vals;
   kv_->Wait(kv_->Pull(keys, &vals));
+  cout << "save model" << endl;
   ofstream out(filename);
   for(int i = 0; i < model_size;i++) {
     int w = i / nhidden_;
