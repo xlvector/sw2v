@@ -84,17 +84,23 @@ bool SparseWord2Vec::SkipFreqWord(int w) {
 
 void SparseWord2Vec::SaveModel(const char * filename) {
   int model_size = freq_.size() * nhidden_;
-  vector<ps::Key> keys(model_size, 0);
-  for(int i = 0; i < model_size; i++) keys[i] = i;
-  vector<float> vals;
-  kv_->Wait(kv_->Pull(keys, &vals));
+  int nword = freq_.size();
   cout << "save model" << endl;
   ofstream out(filename);
-  for(int i = 0; i < model_size;i++) {
-    int w = i / nhidden_;
-    out << w << "\t" << words_[w] << "\t" << vals[i] << endl;
+  for(int w = 0; w < nword; w++) {
+    if(freq_[w] < 5) continue;
+    vector<ps::Key> keys(nhidden_, 0);
+    for(int k = 0; k < nhidden_; k++) {
+      keys[k] = w * nhidden_ + k;
+    }
+    vector<float> vals;
+    kv_->Wait(kv_->Pull(keys, &vals));
+    for(int k = 0; k < nhidden_; k++) {
+      out << w << "\t" << words_[w] << "\t" << vals[k] << endl;
+    }
   }
   out.close();
+  cout << "save model ok" << endl;
 }
 
 float auc(vector< pair<int, float> > & label_preds) {
