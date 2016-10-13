@@ -56,7 +56,7 @@ void SparseWord2Vec::LoadVocab(const char * fname) {
   int model_size = nword * nhidden_;
   vector<ps::Key> keys(nword, 0);
   vector<float> vals(nword, 0);
-  for(int i = 0; i < nword; i++) {
+  for(int i = 0; i < model_size; i++) {
     keys[i] = rand() % model_size;
     vals[i] = (RAND01() - 0.5) / sqrt(float(nhidden_) + 1.0);
   }
