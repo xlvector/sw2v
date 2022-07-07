@@ -1,10 +1,10 @@
-FROM index.alauda.cn/featured/phusion-baseimage
+FROM phusion/baseimage
 
 RUN apt-get update && apt-get install -y git
 
 RUN apt-get install -y build-essential wget libboost-dev libboost-system-dev
 
-RUN git clone --recursive https://github.com/xlvector/sw2v /tmp/sw2v
+RUN git clone --recursive http://github.com/xlvector/sw2v /tmp/sw2v
 
 RUN cd /tmp/sw2v/ps-lite && make
 
